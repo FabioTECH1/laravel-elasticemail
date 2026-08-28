@@ -1,6 +1,6 @@
 <?php
 
-use Dataphyte\LaravelElasticEmail\Transport\ElasticEmailTransport;
+use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransport;
 
 it('registers an Elastic Email mailer automatically', function () {
     expect(config('mail.mailers.elasticemail'))

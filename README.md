@@ -13,7 +13,7 @@ This package does not use SMTP.
 ## Installation
 
 ```bash
-composer require dataphyte/laravel-elasticemail
+composer require fabiotech/laravel-elasticemail
 ```
 
 Laravel discovers the package service provider automatically. Configure the mailer and API key:

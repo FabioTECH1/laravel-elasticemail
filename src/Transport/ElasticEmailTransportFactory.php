@@ -1,6 +1,6 @@
 <?php
 
-namespace Dataphyte\LaravelElasticEmail\Transport;
+namespace FabioTech\LaravelElasticEmail\Transport;
 
 use ElasticEmail\Api\EmailsApi;
 use ElasticEmail\Configuration;

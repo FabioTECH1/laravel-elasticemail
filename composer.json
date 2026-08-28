@@ -1,5 +1,5 @@
 {
-    "name": "dataphyte/laravel-elasticemail",
+    "name": "fabiotech/laravel-elasticemail",
     "description": "A production-ready Elastic Email API transport for Laravel Mail.",
     "keywords": [
         "elastic email",
@@ -12,7 +12,7 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "Dataphyte"
+            "name": "FabioTech"
         }
     ],
     "require": {
@@ -33,12 +33,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Dataphyte\\LaravelElasticEmail\\": "src/"
+            "FabioTech\\LaravelElasticEmail\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Dataphyte\\LaravelElasticEmail\\Tests\\": "tests/"
+            "FabioTech\\LaravelElasticEmail\\Tests\\": "tests/"
         }
     },
     "scripts": {
@@ -48,7 +48,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Dataphyte\\LaravelElasticEmail\\ElasticEmailServiceProvider"
+                "FabioTech\\LaravelElasticEmail\\ElasticEmailServiceProvider"
             ]
         }
     },

@@ -1,8 +1,8 @@
 <?php
 
-namespace Dataphyte\LaravelElasticEmail;
+namespace FabioTech\LaravelElasticEmail;
 
-use Dataphyte\LaravelElasticEmail\Transport\ElasticEmailTransportFactory;
+use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransportFactory;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;

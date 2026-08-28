@@ -1,8 +1,8 @@
 <?php
 
-namespace Dataphyte\LaravelElasticEmail\Tests;
+namespace FabioTech\LaravelElasticEmail\Tests;
 
-use Dataphyte\LaravelElasticEmail\ElasticEmailServiceProvider;
+use FabioTech\LaravelElasticEmail\ElasticEmailServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 abstract class TestCase extends Orchestra

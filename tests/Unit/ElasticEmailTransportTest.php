@@ -1,12 +1,12 @@
 <?php
 
-use Dataphyte\LaravelElasticEmail\Transport\ElasticEmailTransport;
 use ElasticEmail\Api\EmailsApi;
 use ElasticEmail\ApiException;
 use ElasticEmail\Configuration;
 use ElasticEmail\Model\BodyContentType;
 use ElasticEmail\Model\EmailSend;
 use ElasticEmail\Model\EmailTransactionalMessageData;
+use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransport;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
@@ -73,9 +73,9 @@ it('maps Laravel email content, recipients, and attachments to SDK models', func
             expect($recipients->getCc())->toBe(['"Copy Recipient" <copy@example.org>']);
             expect($recipients->getBcc())->toBe(['blind@example.net']);
             expect($content->getSubject())->toBe('Invoice ready');
-            expect($content->getFrom())->toBe('"Dataphyte Billing" <billing@dataphyte.com>');
-            expect($content->getEnvelopeFrom())->toBe('billing@dataphyte.com');
-            expect($content->getReplyTo())->toBe('"Support" <support@dataphyte.com>');
+            expect($content->getFrom())->toBe('"Example Billing" <billing@example.com>');
+            expect($content->getEnvelopeFrom())->toBe('billing@example.com');
+            expect($content->getReplyTo())->toBe('"Support" <support@example.com>');
             expect($body)->toHaveCount(2);
             expect($body[0]->getContentType())->toBe(BodyContentType::HTML);
             expect($body[0]->getContent())->toBe('<h1>Your invoice</h1>');
@@ -92,11 +92,11 @@ it('maps Laravel email content, recipients, and attachments to SDK models', func
 
     $transport = new ElasticEmailTransport('test-api-key', $emailsApi);
     $email = (new Email)
-        ->from(new Address('billing@dataphyte.com', 'Dataphyte Billing'))
+        ->from(new Address('billing@example.com', 'Example Billing'))
         ->to(new Address('recipient@example.com', 'Primary Recipient'))
         ->cc(new Address('copy@example.org', 'Copy Recipient'))
         ->bcc('blind@example.net')
-        ->replyTo(new Address('support@dataphyte.com', 'Support'))
+        ->replyTo(new Address('support@example.com', 'Support'))
         ->subject('Invoice ready')
         ->html('<h1>Your invoice</h1>')
         ->text('Your invoice')
@@ -147,7 +147,7 @@ it('logs redacted diagnostics and exposes only a safe transport exception', func
 
     $transport = new ElasticEmailTransport('test-api-key', $emailsApi, $logger);
     $email = (new Email)
-        ->from('billing@dataphyte.com')
+        ->from('billing@example.com')
         ->to('recipient@example.com')
         ->cc('copy@example.org')
         ->bcc('blind@example.net')

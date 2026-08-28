@@ -1,7 +1,7 @@
 <?php
 
-use Dataphyte\LaravelElasticEmail\Transport\ElasticEmailTransport;
-use Dataphyte\LaravelElasticEmail\Transport\ElasticEmailTransportFactory;
+use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransport;
+use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransportFactory;
 
 it('creates the transport with valid configuration', function () {
     $transport = (new ElasticEmailTransportFactory)->make([
