@@ -1,0 +1,63 @@
+{
+    "name": "dataphyte/laravel-elasticemail",
+    "description": "A production-ready Elastic Email API transport for Laravel Mail.",
+    "keywords": [
+        "elastic email",
+        "email",
+        "laravel",
+        "mailer",
+        "transport"
+    ],
+    "homepage": "https://github.com/dataphyte/laravel-elasticemail",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Dataphyte"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "elasticemail/elasticemail-php": "^4.2",
+        "guzzlehttp/guzzle": "^7.3",
+        "illuminate/mail": "^12.0 || ^13.0",
+        "illuminate/support": "^12.0 || ^13.0",
+        "psr/log": "^1.0 || ^2.0 || ^3.0",
+        "symfony/mailer": "^7.2 || ^8.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.22",
+        "mockery/mockery": "^1.6",
+        "orchestra/testbench": "^10.8 || ^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dataphyte\\LaravelElasticEmail\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Dataphyte\\LaravelElasticEmail\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "format": "pint",
+        "test": "pest --compact"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Dataphyte\\LaravelElasticEmail\\ElasticEmailServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
