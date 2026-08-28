@@ -2,14 +2,21 @@ name: tests
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
   contents: read
 
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     strategy:
       fail-fast: false
@@ -17,24 +24,47 @@ jobs:
         include:
           - php: '8.3'
             testbench: '^10.8'
+            composer-options: '--with laravel/framework:12.61.1 --with guzzlehttp/guzzle:7.15.2 --with guzzlehttp/psr7:2.13.0 --with symfony/mailer:7.4.14 --with symfony/mime:7.4.13'
           - php: '8.4'
             testbench: '^10.8'
+            composer-options: ''
           - php: '8.3'
             testbench: '^11.0'
+            composer-options: ''
           - php: '8.4'
             testbench: '^11.0'
+            composer-options: ''
           - php: '8.5'
             testbench: '^11.0'
+            composer-options: ''
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: ${{ matrix.php }}
           coverage: none
 
-      - run: composer require --dev "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
-      - run: composer update --prefer-dist --no-interaction
       - run: composer validate --strict
+      - run: composer require --dev "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
+      - run: composer update --prefer-dist --no-interaction ${{ matrix.composer-options }}
       - run: composer test
+
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - run: composer install --prefer-dist --no-interaction
+      - run: composer audit --locked
+      - run: composer analyse
+      - run: composer format
+      - run: git diff --exit-code
