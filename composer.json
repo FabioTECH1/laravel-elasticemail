@@ -8,7 +8,7 @@
         "mailer",
         "transport"
     ],
-    "homepage": "https://github.com/dataphyte/laravel-elasticemail",
+    "homepage": "https://github.com/FabioTECH1/laravel-elasticemail",
     "license": "MIT",
     "authors": [
         {
