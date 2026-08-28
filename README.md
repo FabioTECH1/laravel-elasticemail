@@ -24,13 +24,6 @@ ELASTIC_EMAIL_API_KEY=your-api-key
 
 No application service-provider code and no manual `config/mail.php` entry are required.
 
-For a source install before a release is available on Packagist, register the public repository explicitly:
-
-```bash
-composer config repositories.fabiotech-laravel-elasticemail vcs https://github.com/FabioTECH1/laravel-elasticemail
-composer require fabiotech/laravel-elasticemail:^0.3
-```
-
 ## Usage
 
 Use Laravel Mailables and Notifications normally:
