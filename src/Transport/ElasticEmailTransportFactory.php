@@ -55,6 +55,7 @@ final class ElasticEmailTransportFactory
 
         $configuration = (new Configuration)->setApiKey('X-ElasticEmail-ApiKey', $key);
         $handler = HandlerStack::create();
+        $handler->push(new ClassifyRequestFailure, 'elasticemail_failure_classification');
         $handler->push(new LimitResponseBody($maxResponseBytes), 'elasticemail_response_limit');
         $client = new Client([
             'allow_redirects' => false,

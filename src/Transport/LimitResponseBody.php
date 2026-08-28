@@ -2,7 +2,7 @@
 
 namespace FabioTech\LaravelElasticEmail\Transport;
 
-use GuzzleHttp\Exception\RequestException;
+use FabioTech\LaravelElasticEmail\Exception\ClassifiedRequestException;
 use GuzzleHttp\Psr7\Utils;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -33,7 +33,11 @@ final readonly class LimitResponseBody
         $declaredLength = $response->getHeaderLine('Content-Length');
 
         if (ctype_digit($declaredLength) && (int) $declaredLength > $this->maxBytes) {
-            throw new RequestException('Elastic Email API response exceeded the configured byte limit.', $request);
+            throw new ClassifiedRequestException(
+                ClassifiedRequestException::RESPONSE_LIMIT,
+                'Elastic Email API response exceeded the configured byte limit.',
+                $request,
+            );
         }
 
         $body = $response->getBody();
@@ -56,11 +60,19 @@ final readonly class LimitResponseBody
                 $contents .= $chunk;
             }
         } catch (Throwable) {
-            throw new RequestException('Unable to read the Elastic Email API response safely.', $request);
+            throw new ClassifiedRequestException(
+                ClassifiedRequestException::RESPONSE_READ,
+                'Unable to read the Elastic Email API response safely.',
+                $request,
+            );
         }
 
         if (strlen($contents) > $this->maxBytes || ! $body->eof()) {
-            throw new RequestException('Elastic Email API response exceeded the configured byte limit.', $request);
+            throw new ClassifiedRequestException(
+                ClassifiedRequestException::RESPONSE_LIMIT,
+                'Elastic Email API response exceeded the configured byte limit.',
+                $request,
+            );
         }
 
         return $response->withBody(Utils::streamFor($contents));

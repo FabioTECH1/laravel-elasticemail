@@ -7,12 +7,16 @@ use ElasticEmail\Model\BodyContentType;
 use ElasticEmail\Model\EmailSend;
 use ElasticEmail\Model\EmailTransactionalMessageData;
 use FabioTech\LaravelElasticEmail\Exception\MessageRejectedException;
+use FabioTech\LaravelElasticEmail\Transport\ClassifyRequestFailure;
 use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransport;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Psr7\Response;
 use Mockery\MockInterface;
+use Psr\Http\Message\RequestInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mime\Address;
@@ -130,11 +134,14 @@ it('logs only bounded metadata and exposes only a safe transport exception', fun
         ->with('Elastic Email API request failed.', Mockery::on(function (array $context): bool {
             expect($context)
                 ->status_code->toBe(400)
+                ->failure_kind->toBe('http')
                 ->retryable->toBeFalse()
                 ->recipient_count->toBe(3)
                 ->recipient_counts->toBe(['bcc' => 1, 'cc' => 1, 'to' => 1])
                 ->attachment_count->toBe(1)
                 ->attachment_bytes->toBe(17);
+
+            expect($context['elapsed_ms'])->toBeInt()->toBeGreaterThanOrEqual(0);
 
             expect($context)->not->toHaveKeys([
                 'from_domain',
@@ -174,7 +181,7 @@ it('logs only bounded metadata and exposes only a safe transport exception', fun
         ->toThrow(TransportException::class, 'Elastic Email API request failed with status 400.');
 });
 
-it('classifies transient failures without retrying a potentially delivered email', function (int $statusCode, bool $retryable) {
+it('classifies transient failures without retrying a potentially delivered email', function (int $statusCode, string $failureKind, bool $retryable) {
     /** @var EmailsApi&MockInterface $emailsApi */
     $emailsApi = Mockery::mock(EmailsApi::class);
     $emailsApi->shouldReceive('emailsTransactionalPost')
@@ -185,8 +192,10 @@ it('classifies transient failures without retrying a potentially delivered email
     $logger = Mockery::mock(LoggerInterface::class);
     $logger->shouldReceive('error')
         ->once()
-        ->with('Elastic Email API request failed.', Mockery::on(function (array $context) use ($retryable): bool {
+        ->with('Elastic Email API request failed.', Mockery::on(function (array $context) use ($failureKind, $retryable): bool {
+            expect($context['failure_kind'])->toBe($failureKind);
             expect($context['retryable'])->toBe($retryable);
+            expect($context['elapsed_ms'])->toBeInt()->toBeGreaterThanOrEqual(0);
 
             return true;
         }));
@@ -200,12 +209,122 @@ it('classifies transient failures without retrying a potentially delivered email
 
     expect(fn () => $transport->send($email))->toThrow(TransportException::class);
 })->with([
-    'connection failure' => [0, true],
-    'request timeout' => [408, true],
-    'rate limited' => [429, true],
-    'server failure' => [503, true],
-    'invalid request' => [400, false],
+    'unclassified API failure' => [0, 'api', true],
+    'request timeout' => [408, 'http', true],
+    'rate limited' => [429, 'http', true],
+    'server failure' => [503, 'http', true],
+    'invalid request' => [400, 'http', false],
 ]);
+
+it('preserves safe network failure diagnoses through the SDK wrapper', function (string $failureKind, string $exceptionMessage, bool $retryable) {
+    /** @var EmailsApi&MockInterface $emailsApi */
+    $emailsApi = Mockery::mock(EmailsApi::class);
+    $emailsApi->shouldReceive('emailsTransactionalPost')
+        ->once()
+        ->andThrow(new ApiException("[0] [elasticemail-failure:{$failureKind}]"));
+
+    /** @var LoggerInterface&MockInterface $logger */
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldReceive('error')
+        ->once()
+        ->with('Elastic Email API request failed.', Mockery::on(function (array $context) use ($failureKind, $retryable): bool {
+            expect($context['failure_kind'])->toBe($failureKind);
+            expect($context['retryable'])->toBe($retryable);
+            expect($context['status_code'])->toBeNull();
+            expect($context['elapsed_ms'])->toBeInt()->toBeGreaterThanOrEqual(0);
+
+            return true;
+        }));
+
+    $transport = new ElasticEmailTransport('test-api-key', $emailsApi, $logger);
+    $email = (new Email)
+        ->from('sender@example.com')
+        ->to('recipient@example.com')
+        ->subject('Test')
+        ->text('Hello');
+
+    expect(fn () => $transport->send($email))
+        ->toThrow(TransportException::class, $exceptionMessage);
+})->with([
+    'timeout' => ['timeout', 'Elastic Email API request timed out before receiving a response.', true],
+    'DNS' => ['dns', 'Elastic Email API provider host could not be resolved.', true],
+    'TLS' => ['tls', 'Elastic Email API TLS connection failed.', true],
+    'connection' => ['connect', 'Elastic Email API connection failed before receiving a response.', true],
+    'request' => ['request', 'Elastic Email API request failed before receiving a response.', true],
+    'response read' => ['response_read', 'Elastic Email API response could not be read safely.', true],
+    'response limit' => ['response_limit', 'Elastic Email API response exceeded the configured byte limit.', false],
+]);
+
+it('carries a classified HTTP client failure through the real SDK boundary', function () {
+    $handler = function (RequestInterface $request) {
+        return Create::rejectionFor(new ConnectException(
+            'timeout mentioning recipient@example.com and test-api-key',
+            $request,
+            handlerContext: ['errno' => 28],
+        ));
+    };
+    $stack = HandlerStack::create($handler);
+    $stack->push(new ClassifyRequestFailure);
+    $configuration = (new Configuration)
+        ->setApiKey('X-ElasticEmail-ApiKey', 'test-api-key');
+
+    /** @var LoggerInterface&MockInterface $logger */
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldReceive('error')
+        ->once()
+        ->with('Elastic Email API request failed.', Mockery::on(function (array $context): bool {
+            expect($context['failure_kind'])->toBe('timeout');
+            expect($context['retryable'])->toBeTrue();
+            expect(json_encode($context, JSON_THROW_ON_ERROR))
+                ->not->toContain('recipient@example.com')
+                ->not->toContain('test-api-key');
+
+            return true;
+        }));
+
+    $transport = new ElasticEmailTransport(
+        key: 'test-api-key',
+        emailsApi: new EmailsApi(new Client(['handler' => $stack]), $configuration),
+        logger: $logger,
+    );
+    $email = (new Email)
+        ->from('sender@example.com')
+        ->to('recipient@example.com')
+        ->subject('Test')
+        ->text('Hello');
+
+    expect(fn () => $transport->send($email))
+        ->toThrow(TransportException::class, 'Elastic Email API request timed out before receiving a response.');
+});
+
+it('treats a successful HTTP status with an invalid provider response as permanent', function () {
+    /** @var EmailsApi&MockInterface $emailsApi */
+    $emailsApi = Mockery::mock(EmailsApi::class);
+    $emailsApi->shouldReceive('emailsTransactionalPost')
+        ->once()
+        ->andThrow(new ApiException('provider-controlled response', 200));
+
+    /** @var LoggerInterface&MockInterface $logger */
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldReceive('error')
+        ->once()
+        ->with('Elastic Email API request failed.', Mockery::on(function (array $context): bool {
+            expect($context['failure_kind'])->toBe('provider_response');
+            expect($context['retryable'])->toBeFalse();
+
+            return true;
+        }));
+
+    $transport = new ElasticEmailTransport('test-api-key', $emailsApi, $logger);
+    $email = (new Email)
+        ->from('sender@example.com')
+        ->to('recipient@example.com')
+        ->subject('Test')
+        ->text('Hello');
+
+    expect(fn () => $transport->send($email))
+        ->toThrow(TransportException::class, 'Elastic Email API returned an invalid response with status 200.');
+});
 
 it('accepts bodies at the byte limit and rejects the next byte before calling the API', function () {
     /** @var EmailsApi&MockInterface $emailsApi */

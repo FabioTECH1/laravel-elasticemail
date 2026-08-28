@@ -2,7 +2,7 @@
 
 namespace FabioTech\LaravelElasticEmail\Transport;
 
-use GuzzleHttp\Exception\RequestException;
+use FabioTech\LaravelElasticEmail\Exception\ClassifiedRequestException;
 use GuzzleHttp\Psr7\StreamDecoratorTrait;
 use GuzzleHttp\Psr7\Utils;
 use Psr\Http\Message\RequestInterface;
@@ -33,9 +33,10 @@ final class BoundedResponseStream implements StreamInterface
         $chunkBytes = strlen($string);
 
         if ($chunkBytes > $this->maxBytes - $this->writtenBytes) {
-            throw new RequestException(
-                'Elastic Email API response exceeded the configured byte limit.',
-                $this->request,
+            throw new ClassifiedRequestException(
+                failureKind: ClassifiedRequestException::RESPONSE_LIMIT,
+                safeMessage: 'Elastic Email API response exceeded the configured byte limit.',
+                request: $this->request,
             );
         }
 

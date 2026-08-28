@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.3.1 - 2026-08-28
+
+- Add privacy-safe failure categories and elapsed milliseconds to API failure logs.
+- Preserve timeout, DNS, TLS, connection, response-read, and response-limit diagnoses through the Elastic Email SDK's exception wrapper.
+- Expose specific safe transport exception messages without logging provider-controlled response data.
+
 ## 0.3.0 - 2026-08-28
 
 - Bound body, attachment, aggregate message, metadata/header, recipient, encoded payload, and provider response sizes.

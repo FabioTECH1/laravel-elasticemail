@@ -99,7 +99,7 @@ Body resources must be local and seekable. Symfony's normal attachment APIs use 
 
 - Give the API key only `SendHttp` permission, keep it in an environment secret store, and rotate it immediately if it may have leaked.
 - TLS verification is enabled, redirects are disabled, and both request time and decoded response size are bounded on the package-managed client.
-- Failure logs contain only counts, byte lengths, the numeric status, retryability, and exception class. Addresses, domains, subjects, content, provider error prose, request IDs, and credentials are never logged by this package.
+- Failure logs contain only counts, byte lengths, elapsed milliseconds, a safe failure category, the numeric status, retryability, and exception class. Addresses, domains, subjects, content, provider error prose, request IDs, and credentials are never logged by this package.
 - Validate authorization, destination addresses, uploads, and rate limits before constructing a Mailable. Isolate mail queues from latency-sensitive jobs and set a finite PHP memory limit.
 - The response cap applies when Laravel creates the transport through this package. If you directly instantiate `ElasticEmailTransport` with a custom `EmailsApi`, that client is your security boundary and must enforce an equivalent decoded-response limit, TLS verification, redirect policy, and timeouts.
 
@@ -107,9 +107,9 @@ See [SECURITY.md](SECURITY.md) for private vulnerability reporting and supported
 
 ## Failures and retries
 
-Provider and network failures become safe Symfony `TransportException` instances. Local policy failures use `MessageRejectedException`, a permanent transport failure that applications can catch separately.
+Provider and network failures become safe Symfony `TransportException` instances. The exception message distinguishes HTTP, timeout, DNS, TLS, connection, provider-response, response-read, and response-limit failures without exposing provider-controlled data. Local policy failures use `MessageRejectedException`, a permanent transport failure that applications can catch separately.
 
-Connection failures, HTTP 408, 425, 429, and 5xx responses are marked retryable in log metadata. The transport does not retry automatically: a timeout can happen after the provider accepted the email, so blind retries can create duplicate deliveries. Configure finite queue attempts, exponential backoff, and an application idempotency strategy appropriate to the message. Do not endlessly retry `MessageRejectedException` jobs.
+Failure logs include `failure_kind` (`api`, `connect`, `dns`, `http`, `provider_response`, `request`, `response_limit`, `response_read`, `timeout`, or `tls`) and non-negative `elapsed_ms` fields. Connection failures, HTTP 408, 425, 429, and 5xx responses are marked retryable; a response-limit failure is not. The transport does not retry automatically: a timeout can happen after the provider accepted the email, so blind retries can create duplicate deliveries. Configure finite queue attempts, exponential backoff, and an application idempotency strategy appropriate to the message. Do not endlessly retry `MessageRejectedException` jobs.
 
 ## Deployment checklist
 

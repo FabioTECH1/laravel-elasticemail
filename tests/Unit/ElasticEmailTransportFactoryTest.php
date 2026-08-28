@@ -1,13 +1,17 @@
 <?php
 
+use FabioTech\LaravelElasticEmail\Exception\ClassifiedRequestException;
+use FabioTech\LaravelElasticEmail\Transport\ClassifyRequestFailure;
 use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransport;
 use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransportFactory;
 use FabioTech\LaravelElasticEmail\Transport\LimitResponseBody;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise\Create;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
 
@@ -167,4 +171,60 @@ it('stops chunked response writes before they can exceed the sink limit', functi
 
     expect(fn () => $client->get('https://api.elasticemail.com/test'))
         ->toThrow(RequestException::class, 'Elastic Email API response exceeded the configured byte limit.');
+});
+
+it('classifies connection failures without retaining unsafe exception text', function (int|string|null $errorNumber, string $failureKind) {
+    $request = new Request('POST', 'https://api.elasticemail.com/secret?token=unsafe');
+    $handler = fn () => Create::rejectionFor(new ConnectException(
+        'cURL failure containing recipient@example.com and test-api-key',
+        $request,
+        handlerContext: ['errno' => $errorNumber],
+    ));
+    $stack = HandlerStack::create($handler);
+    $stack->push(new ClassifyRequestFailure);
+    $client = new Client(['handler' => $stack]);
+
+    try {
+        $client->send($request);
+        test()->fail('Expected a classified request exception.');
+    } catch (ClassifiedRequestException $exception) {
+        expect($exception->failureKind())->toBe($failureKind);
+        expect($exception->getMessage())
+            ->toContain("[elasticemail-failure:{$failureKind}]")
+            ->not->toContain('recipient@example.com')
+            ->not->toContain('test-api-key')
+            ->not->toContain('token=unsafe');
+    }
+})->with([
+    'timeout' => [28, 'timeout'],
+    'DNS integer' => [6, 'dns'],
+    'DNS numeric string' => ['5', 'dns'],
+    'TLS' => [60, 'tls'],
+    'connection refused' => [7, 'connect'],
+    'missing cURL context' => [null, 'connect'],
+]);
+
+it('classifies generic request failures and preserves their HTTP response', function () {
+    $request = new Request('POST', 'https://api.elasticemail.com/test');
+    $response = new Response(503);
+    $handler = fn () => Create::rejectionFor(new RequestException(
+        'unsafe provider response',
+        $request,
+        $response,
+    ));
+    $stack = HandlerStack::create($handler);
+    $stack->push(new ClassifyRequestFailure);
+    $client = new Client(['handler' => $stack, 'http_errors' => false]);
+
+    try {
+        $client->send($request);
+        test()->fail('Expected a classified request exception.');
+    } catch (ClassifiedRequestException $exception) {
+        expect($exception->failureKind())->toBe('request');
+        expect($exception->getResponse())->toBe($response);
+        expect($exception->getCode())->toBe(503);
+        expect($exception->getMessage())
+            ->toContain('[elasticemail-failure:request]')
+            ->not->toContain('unsafe provider response');
+    }
 });

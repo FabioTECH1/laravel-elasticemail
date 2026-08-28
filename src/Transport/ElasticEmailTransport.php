@@ -12,6 +12,7 @@ use ElasticEmail\Model\EmailTransactionalMessageData;
 use ElasticEmail\Model\MessageAttachment;
 use ElasticEmail\Model\TransactionalRecipient;
 use ElasticEmail\ObjectSerializer;
+use FabioTech\LaravelElasticEmail\Exception\ClassifiedRequestException;
 use FabioTech\LaravelElasticEmail\Exception\MessageRejectedException;
 use InvalidArgumentException;
 use JsonException;
@@ -127,6 +128,7 @@ final class ElasticEmailTransport extends AbstractTransport
         }
 
         $payload = $this->getPayload($originalMessage, $message);
+        $startedAt = hrtime(true);
 
         try {
             /** @var EmailSend $response */
@@ -138,19 +140,18 @@ final class ElasticEmailTransport extends AbstractTransport
             }
         } catch (ApiException $exception) {
             $statusCode = (int) $exception->getCode();
+            $failureKind = $this->failureKind($exception, $statusCode);
 
             $this->getLogger()->error('Elastic Email API request failed.', [
                 ...$this->emailContext($originalMessage, $payload),
+                'elapsed_ms' => $this->elapsedMilliseconds($startedAt),
                 'exception_class' => $exception::class,
-                'retryable' => $this->isRetryable($statusCode),
+                'failure_kind' => $failureKind,
+                'retryable' => $this->isRetryable($statusCode, $failureKind),
                 'status_code' => $statusCode ?: null,
             ]);
 
-            $exceptionMessage = $statusCode > 0
-                ? "Elastic Email API request failed with status {$statusCode}."
-                : 'Elastic Email API request failed before receiving a response.';
-
-            throw new TransportException($exceptionMessage, $statusCode);
+            throw new TransportException($this->exceptionMessage($statusCode, $failureKind), $statusCode);
         }
     }
 
@@ -183,11 +184,50 @@ final class ElasticEmailTransport extends AbstractTransport
         ];
     }
 
-    private function isRetryable(int $statusCode): bool
+    private function failureKind(ApiException $exception, int $statusCode): string
     {
-        return $statusCode === 0
-            || in_array($statusCode, [408, 425, 429], true)
-            || $statusCode >= 500;
+        if ($statusCode >= 400) {
+            return 'http';
+        }
+
+        if ($statusCode > 0) {
+            return 'provider_response';
+        }
+
+        return ClassifiedRequestException::failureKindFromMessage($exception->getMessage()) ?? 'api';
+    }
+
+    private function isRetryable(int $statusCode, string $failureKind): bool
+    {
+        return in_array($statusCode, [408, 425, 429], true)
+            || $statusCode >= 500
+            || ($statusCode === 0 && $failureKind !== ClassifiedRequestException::RESPONSE_LIMIT);
+    }
+
+    private function exceptionMessage(int $statusCode, string $failureKind): string
+    {
+        if ($statusCode >= 400) {
+            return "Elastic Email API request failed with status {$statusCode}.";
+        }
+
+        if ($statusCode > 0) {
+            return "Elastic Email API returned an invalid response with status {$statusCode}.";
+        }
+
+        return match ($failureKind) {
+            ClassifiedRequestException::CONNECT => 'Elastic Email API connection failed before receiving a response.',
+            ClassifiedRequestException::DNS => 'Elastic Email API provider host could not be resolved.',
+            ClassifiedRequestException::RESPONSE_LIMIT => 'Elastic Email API response exceeded the configured byte limit.',
+            ClassifiedRequestException::RESPONSE_READ => 'Elastic Email API response could not be read safely.',
+            ClassifiedRequestException::TIMEOUT => 'Elastic Email API request timed out before receiving a response.',
+            ClassifiedRequestException::TLS => 'Elastic Email API TLS connection failed.',
+            default => 'Elastic Email API request failed before receiving a response.',
+        };
+    }
+
+    private function elapsedMilliseconds(int|float $startedAt): int
+    {
+        return (int) max(0, floor((hrtime(true) - $startedAt) / 1_000_000));
     }
 
     private function getPayload(Email $email, SentMessage $message): EmailTransactionalMessageData
