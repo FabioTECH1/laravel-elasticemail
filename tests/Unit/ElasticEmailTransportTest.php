@@ -8,6 +8,7 @@ use ElasticEmail\Model\EmailSend;
 use ElasticEmail\Model\EmailTransactionalMessageData;
 use FabioTech\LaravelElasticEmail\Exception\MessageRejectedException;
 use FabioTech\LaravelElasticEmail\Transport\ClassifyRequestFailure;
+use FabioTech\LaravelElasticEmail\Transport\CompatibilityEmailsApi;
 use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransport;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
@@ -41,7 +42,7 @@ it('uses the SDK transactional endpoint over HTTP with explicit timeouts', funct
         ->setApiKey('X-ElasticEmail-ApiKey', 'test-api-key');
     $transport = new ElasticEmailTransport(
         key: 'test-api-key',
-        emailsApi: new EmailsApi($client, $configuration),
+        emailsApi: new CompatibilityEmailsApi($client, $configuration),
     );
 
     $email = (new Email)
@@ -284,7 +285,7 @@ it('carries a classified HTTP client failure through the real SDK boundary', fun
 
     $transport = new ElasticEmailTransport(
         key: 'test-api-key',
-        emailsApi: new EmailsApi(new Client(['handler' => $stack]), $configuration),
+        emailsApi: new CompatibilityEmailsApi(new Client(['handler' => $stack]), $configuration),
         logger: $logger,
     );
     $email = (new Email)
@@ -653,4 +654,43 @@ it('rejects JSON escape amplification before the API serializes the payload', fu
 
     expect(fn () => $transport->send($email))
         ->toThrow(MessageRejectedException::class, 'Email payload exceeds the configured encoded byte limit.');
+});
+
+it('does not emit a deprecation warning when serializing a transactional request payload', function () {
+    $mock = new MockHandler([
+        new Response(200, [], json_encode([
+            'MessageID' => 'provider-message-id',
+            'TransactionID' => 'provider-transaction-id',
+        ], JSON_THROW_ON_ERROR)),
+    ]);
+    $client = new Client(['handler' => HandlerStack::create($mock)]);
+    $configuration = (new Configuration)->setApiKey('X-ElasticEmail-ApiKey', 'test-api-key');
+
+    $transport = new ElasticEmailTransport(
+        key: 'test-api-key',
+        emailsApi: new CompatibilityEmailsApi($client, $configuration),
+    );
+
+    $email = (new Email)
+        ->from('sender@example.com')
+        ->to('recipient@example.com')
+        ->subject('Deprecation Test')
+        ->text('Ensuring no jsonEncode deprecation is emitted.');
+
+    $deprecations = [];
+    set_error_handler(function (int $errno, string $errstr) use (&$deprecations): bool {
+        if ($errno === E_USER_DEPRECATED) {
+            $deprecations[] = $errstr;
+        }
+
+        return true;
+    }, E_USER_DEPRECATED);
+
+    try {
+        $transport->send($email);
+    } finally {
+        restore_error_handler();
+    }
+
+    expect($deprecations)->toBeEmpty();
 });

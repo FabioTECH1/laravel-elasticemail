@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.3.2 - 2026-09-03
+
+- Implement a package-owned compatibility API client to prevent `\GuzzleHttp\Utils::jsonEncode()` deprecation warnings on Guzzle 7.15+ when constructing transactional email payloads.
+
 ## 0.3.1 - 2026-08-28
 
 - Add privacy-safe failure categories and elapsed milliseconds to API failure logs.

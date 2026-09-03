@@ -2,6 +2,7 @@
 
 use FabioTech\LaravelElasticEmail\Exception\ClassifiedRequestException;
 use FabioTech\LaravelElasticEmail\Transport\ClassifyRequestFailure;
+use FabioTech\LaravelElasticEmail\Transport\CompatibilityEmailsApi;
 use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransport;
 use FabioTech\LaravelElasticEmail\Transport\ElasticEmailTransportFactory;
 use FabioTech\LaravelElasticEmail\Transport\LimitResponseBody;
@@ -227,4 +228,15 @@ it('classifies generic request failures and preserves their HTTP response', func
             ->toContain('[elasticemail-failure:request]')
             ->not->toContain('unsafe provider response');
     }
+});
+
+it('wires the compatibility API implementation to prevent Guzzle deprecations', function () {
+    $factory = new ElasticEmailTransportFactory;
+    $transport = $factory->make(['key' => 'test-api-key']);
+
+    $reflection = new ReflectionClass($transport);
+    $property = $reflection->getProperty('emailsApi');
+    $property->setAccessible(true);
+
+    expect($property->getValue($transport))->toBeInstanceOf(CompatibilityEmailsApi::class);
 });

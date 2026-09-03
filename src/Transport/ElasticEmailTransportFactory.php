@@ -2,7 +2,6 @@
 
 namespace FabioTech\LaravelElasticEmail\Transport;
 
-use ElasticEmail\Api\EmailsApi;
 use ElasticEmail\Configuration;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
@@ -68,7 +67,7 @@ final class ElasticEmailTransportFactory
 
         return new ElasticEmailTransport(
             key: $key,
-            emailsApi: new EmailsApi($client, $configuration),
+            emailsApi: new CompatibilityEmailsApi($client, $configuration),
             logger: $logger,
             maxBodyBytes: $maxBodyBytes,
             maxAttachments: $maxAttachments,
