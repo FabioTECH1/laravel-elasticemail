@@ -4,11 +4,21 @@ updates:
   - package-ecosystem: composer
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
+      time: "06:00"
+      timezone: Africa/Lagos
     open-pull-requests-limit: 5
+    groups:
+      elastic-email-sdk:
+        applies-to: version-updates
+        patterns:
+          - elasticemail/elasticemail-php
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Lagos
     open-pull-requests-limit: 5
